@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ board.name }}{% endblock %}
+
+{% block content %}
+<div class="container board-page">
+  <div class="board-header">
+    <h2>{{ board.name }}</h2>
+    <p>{{ board.description or '' }}</p>
+    {% if current_user %}
+    <a href="{{ url_for('board_new', slug=board.slug) }}" class="btn btn-primary">글 쓰기</a>
+    {% else %}
+    <a href="{{ url_for('login') }}" class="btn btn-primary">글 쓰기 (로그인 필요)</a>
+    {% endif %}
+    <a href="{{ url_for('board_list') }}" class="btn btn-small">게시판 목록</a>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr><th>제목</th><th>작성자</th><th>답글 수</th><th>작성일</th></tr>
+    </thead>
+    <tbody>
+      {% for p in posts %}
+      <tr>
+        <td><a href="{{ url_for('post_detail', post_id=p.id) }}">{{ p.title }}</a></td>
+        <td>{{ p.author_username or p.author_id }}</td>
+        <td>{{ p.reply_count }}</td>
+        <td>{{ p.created_at }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">등록된 글이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

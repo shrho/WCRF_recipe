@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_admin_page %}회원 정보 수정{% else %}내 정보 수정{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container auth-page">
+  <div class="auth-card">
+    <h2>{% if is_admin_page %}회원 정보 수정{% else %}내 정보 수정{% endif %}</h2>
+    <form method="post">
+      <div class="form-group">
+        <label>아이디</label>
+        <input type="text" name="username" value="{{ user.username }}" readonly>
+      </div>
+      {% if is_admin_page %}
+      <div class="form-group">
+        <label>역할</label>
+        <select name="role">
+          <option value="user" {% if user.role == 'user' %}selected{% endif %}>이용자</option>
+          <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>관리자</option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="form-group">
+        <label>이메일</label>
+        <input type="email" name="email" value="{{ user.email or '' }}">
+      </div>
+      {% if not is_admin_page %}
+      <div class="form-group">
+        <label>변경할 비밀번호 (빈칸이면 유지)</label>
+        <input type="password" name="password">
+      </div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary">저장</button>
+      <a href="{{ url_for('admin_users') if is_admin_page else url_for('index') }}" class="btn btn-small">취소</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

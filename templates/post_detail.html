@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<div class="container board-page">
+  <div class="post-header">
+    <h2>{{ post.title }}</h2>
+    <div class="post-meta">
+      <span>{{ post.author_username or post.author_id }}</span>
+      <span>{{ post.board_name }}</span>
+      <span>{{ post.created_at }}</span>
+    </div>
+  </div>
+  <div class="post-content">{{ post.content }}</div>
+  <a href="{{ url_for('board_view', slug=post.board_slug) }}" class="btn btn-small">목록으로</a>
+
+  <h3>답글 ({{ replies|length }})</h3>
+  {% if current_user %}
+  <div class="form-group reply-form">
+    <textarea id="reply-content" rows="3" placeholder="답글을 입력하세요"></textarea>
+    <button type="button" id="reply-submit" class="btn btn-small">답글 달기</button>
+  </div>
+  {% else %}
+  <p><a href="{{ url_for('login') }}">로그인</a> 후 답글을 달 수 있습니다.</p>
+  {% endif %}
+  <div id="reply-list">
+    {% for r in replies %}
+    <div class="reply-item">
+      <div class="reply-meta"><strong>{{ r.author_username or r.author_id }}</strong> &mdash; {{ r.created_at }}</div>
+      <div>{{ r.content }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(() => {
+  const postId = {{ post.id }};
+  const btn = document.getElementById('reply-submit');
+  const textarea = document.getElementById('reply-content');
+  const list = document.getElementById('reply-list');
+  btn.addEventListener('click', async () => {
+    const content = textarea.value.trim();
+    if (!content) return;
+    const res = await fetch('/posts/' + postId + '/reply', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({content}),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    const el = document.createElement('div');
+    el.className = 'reply-item';
+    el.innerHTML = '<div class="reply-meta"><strong>' + data.author_username + '</strong> &mdash; ' + data.created_at + '</div><div>' + data.content + '</div>';
+    list.prepend(el);
+    textarea.value = '';
+  });
+})();
+</script>
+{% endblock %}

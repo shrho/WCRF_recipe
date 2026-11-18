@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingredient Catalogue &mdash; WCRF Recipe Book</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <h1>Ingredient Catalogue</h1>
+    <a class="back" href="{{ url_for('index') }}">&larr; Back to recipes</a>
+  </div>
+</header>
+
+<div class="container page-body catalogue-page">
+  <aside class="filters">
+    <h3>Filter by season</h3>
+    <div class="category-list" id="season-list">
+      {% for s in seasons %}
+      <label class="filter-item">
+        <input type="checkbox" value="{{ s }}" data-filter="season">
+        {{ s|capitalize }}
+      </label>
+      {% endfor %}
+    </div>
+    <p class="count" id="catalogue-count">{{ catalogue|length }} ingredients</p>
+  </aside>
+
+  <main class="catalogue-table-wrap">
+    <table id="catalogue-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">Ingredient &#x25BC;</th>
+          <th onclick="sortTable(1)">Season</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in catalogue %}
+        <tr data-season="{{ entry.season }}" data-ingredient="{{ entry.ingredient | lower }}">
+          <td>{{ entry.ingredient }}</td>
+          <td><span class="badge season-badge">{{ entry.season }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script>
+(() => {
+  const seasonCheckboxes = document.querySelectorAll('#season-list input[data-filter="season"]');
+  const rows = document.querySelectorAll('#catalogue-table tbody tr');
+  const countEl = document.getElementById('catalogue-count');
+  const total = rows.length;
+
+  function filter() {
+    const selected = Array.from(seasonCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+    let showing = 0;
+    rows.forEach(row => {
+      const match = selected.length === 0 || selected.includes(row.dataset.season);
+      row.style.display = match ? "" : "none";
+      if (match) showing++;
+    });
+    countEl.textContent = `${showing} of ${total} ingredients`;
+  }
+
+  seasonCheckboxes.forEach(cb => cb.addEventListener("change", filter));
+  filter();
+})();
+
+function sortTable(n) {
+  const table = document.getElementById("catalogue-table");
+  const tbody = table.querySelector("tbody");
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  const dir = table.dataset.sortDir === String(n) ? -1 : 1;
+  table.dataset.sortDir = String(n);
+  rows.sort((a, b) => {
+    const av = a.children[n].textContent.trim().toLowerCase();
+    const bv = b.children[n].textContent.trim().toLowerCase();
+    return av.localeCompare(bv) * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+</body>
+</html>

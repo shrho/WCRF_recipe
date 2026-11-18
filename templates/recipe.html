@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recipe.title }}{% endblock %}
+
+{% block content %}
+<div class="container page-body recipe-page">
+  <article class="recipe-detail">
+    {% if recipe.image %}
+    <img src="/image/{{ recipe.image }}" alt="{{ recipe.title }}">
+    {% endif %}
+    <div class="detail-meta">
+      <span class="badge">{{ category_label(recipe.category) }}</span>
+      <span><strong>인원수:</strong> {{ recipe.servings }}</span>
+      {% if recipe.source_url %}
+      <a class="source-link" href="{{ recipe.source_url }}" target="_blank">WCRF에서 보기 &rarr;</a>
+      {% endif %}
+    </div>
+    <div class="recipe-actions">
+      <button type="button" class="icon-btn fav-btn" data-id="{{ recipe.id }}" data-favorited="{{ 1 if is_favorite else 0 }}" title="즐겨찾기">
+        <span class="heart">{{ '♥' if is_favorite else '♡' }}</span> <span class="fav-count">{{ favorite_count }}</span>
+      </button>
+      <button type="button" class="icon-btn share-btn" data-id="{{ recipe.id }}" title="공유">
+        <span class="share-icon">↗</span> <span class="share-count">{{ share_count }}</span>
+      </button>
+      <a href="{{ url_for('index') }}" class="btn btn-small">목록으로</a>
+    </div>
+    <h1>{{ recipe.title }}</h1>
+    <p class="korean-title">{{ recipe.title_ko }}</p>
+    {% if recipe.description %}
+    <blockquote class="description">{{ recipe.description }}</blockquote>
+    {% endif %}
+
+    <section>
+      <h2>재료</h2>
+      <ul class="ingredients">
+        {% for item in recipe.ingredients %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section>
+      <h2>만드는 법</h2>
+      <ol class="method">
+        {% for step in recipe.method %}
+        <li>{{ step }}</li>
+        {% endfor %}
+      </ol>
+    </section>
+
+    {% if recipe.korean_body %}
+    <details class="korean-section">
+      <summary>한국어 번역 (&hellip;한국어)</summary>
+      <div class="korean-body">
+        {% for line in recipe.korean_body.split("\n") %}
+        {% if line.strip() == "" %}<br>
+        {% elif line.startswith("## ") %}<h3>{{ line[3:] }}</h3>
+        {% elif line.startswith(">") %}<blockquote>{{ line[1:] }}</blockquote>
+        {% elif line.startswith("- ") %}<li>{{ line[2:] }}</li>
+        {% else %}<p>{{ line }}</p>{% endif %}
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    <section class="memo-section">
+      <h2>메모</h2>
+      {% if current_user %}
+      <div class="form-group memo-form">
+        <textarea id="memo-text" rows="4" placeholder="이 레시피에 대한 메모를 남겨보세요."></textarea>
+        <button type="button" id="save-memo" class="btn btn-primary">메모 저장</button>
+      </div>
+      {% else %}
+      <p><a href="{{ url_for('login') }}">로그인</a> 후 메모를 남길 수 있습니다.</p>
+      {% endif %}
+      <span id="memo-status" class="memo-status"></span>
+
+      <div id="memo-list">
+        {% for m in memos %}
+        <div class="memo-item" data-id="{{ m.id }}" data-author-id="{{ m.author_id }}">
+          <div class="memo-header">
+            <strong>{{ m.author_username }}</strong>
+            <span class="memo-date">{{ m.created_at }}</span>
+            {% if (current_user and current_user.id == m.author_id) or (current_user and current_user.role == 'admin') %}
+            <button type="button" class="btn btn-small memo-edit-btn" data-id="{{ m.id }}">수정</button>
+            <button type="button" class="btn btn-small memo-del-btn" data-id="{{ m.id }}">삭제</button>
+            {% endif %}
+          </div>
+          <div class="memo-content" id="memo-content-{{ m.id }}">{{ m.content }}</div>
+          <div class="memo-actions">
+            <button type="button" class="icon-btn like-btn" data-id="{{ m.id }}" data-liked="{{ 1 if m.liked else 0 }}" title="좋아요">
+              <span class="heart">{{ '♥' if m.liked else '♡' }}</span> <span class="like-count">{{ m.like_count }}</span>
+            </button>
+          </div>
+          {% if m.replies %}
+          <div class="replies">
+            {% for r in m.replies %}
+            <div class="reply-item">
+              <strong>{{ r.author_username }}</strong> &mdash; {{ r.created_at }}
+              <div>{{ r.content }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if current_user %}
+          <div class="form-group reply-form">
+            <textarea class="reply-text" data-memo-id="{{ m.id }}" rows="2" placeholder="답글 쓰기..."></textarea>
+            <button type="button" class="btn btn-small reply-btn" data-memo-id="{{ m.id }}">답글 달기</button>
+          </div>
+          {% endif %}
+          {% if (current_user and current_user.id == m.author_id) or (current_user and current_user.role == 'admin') %}
+          <div class="memo-edit-form" id="edit-form-{{ m.id }}" style="display:none;margin-top:0.5rem;">
+            <textarea class="edit-text" data-id="{{ m.id }}">{{ m.content }}</textarea>
+            <button type="button" class="btn btn-small memo-save-btn" data-id="{{ m.id }}">저장</button>
+            <button type="button" class="btn btn-small memo-cancel-btn" data-id="{{ m.id }}">취소</button>
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <p>아직 메모가 없습니다. 첫 메모를 남겨보세요.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </article>
+</div>
+
+<script>
+(() => {
+  const recipeId = {{ recipe.id | tojson }};
+  const currentUser = {{ current_user | tojson }};
+
+  // Save memo
+  const saveBtn = document.getElementById('save-memo');
+  const memoText = document.getElementById('memo-text');
+  const memoStatus = document.getElementById('memo-status');
+  const memoList = document.getElementById('memo-list');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const content = memoText.value.trim();
+      if (!content) return;
+      const res = await fetch('/memos/new', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({recipe_id: recipeId, content}),
+      });
+      const data = await res.json();
+      if (data.error) { memoStatus.textContent = data.error; memoStatus.style.color = '#b00020'; return; }
+      memoText.value = '';
+      memoStatus.textContent = '메모가 저장되었습니다.';
+      memoStatus.style.color = '#7a1f2b';
+      setTimeout(() => { memoStatus.textContent = ''; }, 3000);
+      location.reload();
+    });
+  }
+
+  // Like memo
+  memoList.addEventListener('click', async (e) => {
+    const likeBtn = e.target.closest('.like-btn');
+    if (likeBtn) {
+      const memoId = likeBtn.dataset.id;
+      const res = await fetch('/memos/' + memoId + '/like', {method: 'POST'});
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      const heart = likeBtn.querySelector('.heart');
+      const count = likeBtn.querySelector('.like-count');
+      heart.textContent = data.liked ? '♥' : '♡';
+      count.textContent = data.like_count;
+      likeBtn.dataset.liked = data.liked ? '1' : '0';
+      return;
+    }
+
+    // Reply
+    const replyBtn = e.target.closest('.reply-btn');
+    if (replyBtn) {
+      const memoId = replyBtn.dataset.memoId;
+      const textarea = replyBtn.closest('.reply-form').querySelector('.reply-text');
+      const content = textarea.value.trim();
+      if (!content) return;
+      const res = await fetch('/memos/' + memoId + '/reply', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content}),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      location.reload();
+      return;
+    }
+
+    // Edit memo
+    const editBtn = e.target.closest('.memo-edit-btn');
+    if (editBtn) {
+      const memoId = editBtn.dataset.id;
+      document.getElementById('edit-form-' + memoId).style.display = 'block';
+      return;
+    }
+    const cancelBtn = e.target.closest('.memo-cancel-btn');
+    if (cancelBtn) {
+      const memoId = cancelBtn.dataset.id;
+      document.getElementById('edit-form-' + memoId).style.display = 'none';
+      return;
+    }
+    const saveEditBtn = e.target.closest('.memo-save-btn');
+    if (saveEditBtn) {
+      const memoId = saveEditBtn.dataset.id;
+      const content = document.querySelector('#edit-form-' + memoId + ' .edit-text').value.trim();
+      if (!content) return;
+      const res = await fetch('/memos/' + memoId + '/edit', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content}),
+      });
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      location.reload();
+      return;
+    }
+    const delBtn = e.target.closest('.memo-del-btn');
+    if (delBtn) {
+      const memoId = delBtn.dataset.id;
+      if (!confirm('정말 삭제하시겠습니까?')) return;
+      await fetch('/memos/' + memoId + '/delete', {method: 'POST'});
+      location.reload();
+      return;
+    }
+  });
+
+  // Favorite
+  document.querySelectorAll('.fav-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const res = await fetch('/recipe/' + id + '/favorite', {method: 'POST'});
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      const heart = btn.querySelector('.heart');
+      const count = btn.querySelector('.fav-count');
+      heart.textContent = data.favorited ? '♥' : '♡';
+      count.textContent = data.favorite_count;
+      btn.dataset.favorited = data.favorited ? '1' : '0';
+    });
+  });
+
+  // Share
+  document.querySelectorAll('.share-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const res = await fetch('/recipe/' + id + '/share', {method: 'POST'});
+      const data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      btn.querySelector('.share-count').textContent = data.share_count;
+    });
+  });
+})();
+</script>
+{% endblock %}
